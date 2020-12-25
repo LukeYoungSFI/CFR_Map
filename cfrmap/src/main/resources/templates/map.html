@@ -1,0 +1,598 @@
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport"
+	content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+<!--
+  ArcGIS API for JavaScript, https://js.arcgis.com
+  For more information about the layers-geojson sample, read the original sample description at developers.arcgis.com.
+  https://developers.arcgis.com/javascript/latest/sample-code/layers-geojson/map.html
+  -->
+<title>CFR MAP</title>
+<link rel="stylesheet"
+	href="https://js.arcgis.com/4.17/esri/themes/light/main.css" />
+<style>
+html, body, #viewDiv {
+	padding: 0;
+	margin: 0;
+	height: 100%;
+	width: 100%;
+}
+#layerToggle {
+top: 14px;
+right: 260px;
+position: absolute;
+z-index: 99;
+background-color: white;
+border-radius: 8px;
+padding: 7px;
+opacity: 0.75;
+}
+.esri-ui-corner .esri-expand .esri-widget--panel, 
+.esri-ui-corner .esri-expand .esri-widget--panel-height-only, 
+.esri-ui-corner .esri-component>.esri-widget--panel, 
+.esri-ui-corner .esri-component.esri-widget--panel {
+    width: 160px;
+}
+.esri-legend__service {
+    padding-top: 5px;
+    padding-right: 0px;
+    padding-bottom: 0px;
+    padding-left: 5px;
+    word-wrap: break-word;
+    border-bottom: 1px solid rgba(110,110,110,0.3);
+}
+</style>
+
+<script src="https://js.arcgis.com/4.17/"></script>
+
+<script th:inline="javascript">
+      require([
+        "esri/Map",
+        "esri/layers/GeoJSONLayer",
+        "esri/views/MapView",
+        "esri/widgets/Search",
+		"esri/widgets/Legend",
+        "dojo/fx/Toggler",
+        "esri/PopupTemplate",
+        "esri/popup/content/CustomContent",
+        "esri/tasks/support/Query",
+		"esri/renderers/UniqueValueRenderer",
+        "esri/config"
+      ], function(Map, GeoJSONLayer, MapView, Search, Legend, Toggler, PopupTemplate, CustomContent, Query, UniqueValueRenderer, esriConfig) {
+        // If GeoJSON files are not on the same domain as your website, a CORS enabled server
+        // or a proxy is required.
+        
+        var regionStr = [[${regionStr}]];
+        var urlHeader = [[${urlHeader}]];
+        var token = [[${token}]];
+		console.log("user region(s): " + regionStr);
+        const url =
+          urlHeader + "MapHandler/getMap?regions=" + regionStr + "&token=" + token;
+        esriConfig.request.proxyUrl = url;
+        esriConfig.request.timeout = 300000;
+          //draw marker with different shapes and colors based on locaiton status
+          const renderer = new UniqueValueRenderer({
+            field: "statusName",
+			uniqueValueInfos: [{
+				value: "Active",
+				symbol:{
+					type: "simple-marker",
+					style: "circle",
+					color: "#00CD00"
+				}
+			},{
+				value: "Pending",
+				symbol:{
+					type: "simple-marker",
+					style: "diamond",
+					color: "#FFFF00"
+				}
+			},{
+				value: "Closed",
+				symbol:{
+					type: "simple-marker",
+					style: "square",
+					color: "#CE0000"
+				}
+			},{
+				value: "Decommissi",
+				symbol:{
+					type: "simple-marker",
+					style: "triangle",
+					color: "#000000"
+				}
+			},{
+				value: "Excess",
+				symbol:{
+					type: "simple-marker",
+					style: "x",
+					color: "#3498DB",
+					outline: {
+						color: "#0000FF",
+						width: 3
+					}
+				}
+			}],
+            visualVariables: [
+              {
+                type: "size",
+                field: "mag",
+                stops: [
+                  {
+                    value: 2.5,
+                    size: "4px"
+                  },
+                  {
+                    value: 8,
+                    size: "40px"
+                  }
+                ],
+				legendOptions:{
+					showLegend: false
+				}
+              }
+            ]
+          });
+
+          const geojsonLayer = new GeoJSONLayer({
+            url: url,
+            outFields: ["*"],
+            renderer: renderer 
+          });
+
+          const map = new Map({
+            basemap: "streets",
+            layers: [geojsonLayer]
+          });
+          
+         geojsonLayer.when(function () {
+              zoomToLayer(geojsonLayer);
+            });        
+          
+          function zoomToLayer(layer) {
+              return layer.queryExtent().then(function (response) {
+            	  if(response.extent.xmax - response.extent.xmin > 62 && response.extent.ymax - response.extent.ymin > 27){
+            		  var extent = {
+            	                xmin: -126.902,
+            	                ymin: 23.848,
+            	                xmax: -65.73,
+            	                ymax: 50.15
+            	              };
+                      view.goTo(extent).catch(function (error) {
+                          if (error.name != "AbortError") {
+                            console.error(error);
+                          }
+                        });
+            	  }
+            	  else {         		  
+                view.goTo(response.extent).catch(function (error) {
+                  if (error.name != "AbortError") {
+                    console.error(error);
+                  }
+                });
+            	  }
+              });
+            }
+          const view = new MapView({
+            container: "viewDiv",
+            extent: {
+                xmin: -126.902,
+                ymin: 23.848,
+                xmax: -65.73,
+                ymax: 50.15
+              },
+            map: map,
+            highlightOptions: {
+                color: "red"
+              }
+          });
+		  const legend = new Legend({
+			view:view,
+			id: "mapLegend",
+			layerInfos:[{
+				layer: geojsonLayer,
+				title: "Location Status"
+			}]
+		  });
+          view.ui.add(legend, "bottom-right");
+		  //use the checkbox to show/hide the legend
+		  var legendCheckBox = document.getElementById("legendSwitch");
+		  legendCheckBox.addEventListener("change", function () {
+		  var thisLegend = view.ui.find("mapLegend");
+		  if (legendCheckBox.checked == true){
+			if(thisLegend == null){
+				view.ui.add(legend,"bottom-right");
+			}
+			}else {
+				if(thisLegend != null){
+				view.ui.remove(legend);
+				}
+			}
+		});
+		  const layer = view.map.layers.getItemAt(0);
+		  const legendrenderer = changeRendererLabels(layer.renderer.clone());
+		  layer.renderer = legendrenderer;
+		  function changeRendererLabels(renderer) {
+			renderer.valueExpressionTitle = " ";
+			renderer.uniqueValueInfos.forEach(function (info) {
+				if(info.value == "Decommissi"){
+					info.label = "Decommissioned";
+				}
+			});
+			return renderer;
+		  }
+			
+          const searchWidget = new Search({
+        	  view: view,
+			  allPlaceholder: "Type address or Location Code to search"
+        	});
+        	// Adds the search widget below other elements in
+        	// the top left corner of the view
+        	view.ui.add(searchWidget, {
+        	  position: "top-right",
+        	  index: 2
+        	});
+          
+        	//******************************************
+        	//add loading icon
+        	loading = new Toggler({
+        	   node: "loadingImg"
+        	});
+
+          
+            view.watch("updating", function (updating) {
+        	   updatingViewChange(updating);
+        	});
+
+        	function updatingViewChange(updating)
+        	{
+        		var x = document.getElementById("loadingDiv")
+          		if (updating) {
+            			//loading.show();
+            			x.style.display = "block";
+          		}
+          		else {
+            			//loading.hide();
+        			x.style.display = "none";
+          		}
+        	}
+       //******************************************
+       //Show tooltip when pointer move to a POI
+       let highlight, currentLocationCode, currentLocationName;
+       
+       view.on("pointer-move", function(event){
+		  view.hitTest(event).then(function(response){
+		    if (response.results.length) {
+		      var graphic = response.results.filter(function (result) {
+		        return result.graphic.layer === geojsonLayer;
+		      })[0].graphic;
+				      
+		      const attributes = graphic.attributes;
+	          const locationCode = attributes.locationCode;
+	          const locationName = attributes.locationName;
+	          const id = attributes.OBJECTID;
+	          
+
+              if (highlight &&
+                (currentLocationName !== locationName || currentLocationCode !== locationCode)) {
+                highlight.remove();
+                highlight = null;
+                return;
+              }
+
+              if (highlight) {
+                return;
+              }
+		      
+		     view.whenLayerView(graphic.layer).then(function(layerView){
+		    	 highlight=layerView.highlight(graphic);
+		    	 currentLocationName=locationName;
+		    	 currentLocationCode = locationCode;
+		     });
+		     
+		     document.getElementById("info").style.visibility = "visible";
+             document.getElementById("info").style.top = "" + event.y -50+ "px";
+             document.getElementById("info").style.left = "" + event.x-30 + "px";
+             document.getElementById("name").innerHTML = locationCode+": "+locationName;
+             document.getElementById("info").style.display = "inline-block";
+             document.getElementById("info").style.position = "absolute";
+             
+             
+		    }else {
+           	 if (highlight) {
+                 highlight.remove();
+                 highlight = null;
+               }
+           	document.getElementById("info").style.visibility = "hidden";
+        	}
+		    
+		  });
+		});
+       
+     //******************************************
+     //Show popup window when clicking a POI
+     
+        
+       view.on("click", function(event){
+
+   	    view.hitTest(event).then(function(response){
+	   		    if (response.results.length) {
+	   		    	var obj = response.results.filter(function (result) {
+		   		        return result.graphic.layer === geojsonLayer;
+		   		      })[0];
+	   		    	
+	   		    var features =[];
+	   		    var graphic =obj.graphic;
+	   			const attributes = graphic.attributes;
+	   		    if (highlight) {
+	   		    	highlight.remove();
+	   		        highlight = null;
+	   		    }
+	   		    document.getElementById("info").style.visibility = "hidden";
+	   		         
+	   		               //populate attributes:
+	   		    var attributeInfo=populateAttributes(attributes);
+	   		             
+	   		    graphic.popupTemplate = {
+	   		                     // autocasts as new PopupTemplate()
+	   		    	title: "{locationCode} : {locationName}",
+	   		        content:attributeInfo
+	   		     };
+	   			 features.push(graphic);
+	   		     showPopup(features);
+	   		      
+	   		    	const query = new Query();
+	   		     	query.geometry = obj.mapPoint;
+	   		     	query.distance = 3 * view.resolution;
+	   		     	//query.distance = 1;
+	   		     	//query.units = "miles";
+	   		     	query.spatialRelationship = "intersects";  
+	   		     	query.returnGeometry = true;
+	   		     	query.outFields = [ "*" ];
+	   		     	
+	   		     	geojsonLayer.queryFeatures(query).then(function(response){
+	   		    		
+	   		    		if(response.features.length>0) {
+	   		    			var features =[];
+	   		    			for(var i=0; i<response.features.length;i++){
+	   		    				var graphic = response.features[i];
+								const attributes = graphic.attributes;
+		   		    			if (highlight) {
+		   		                 	highlight.remove();
+		   		                 	highlight = null;
+		   		                }
+		   		           		document.getElementById("info").style.visibility = "hidden";
+		   		   		      	
+		   		           	    //populate attributes:
+		   		           	    var attributeInfo=populateAttributes(attributes);
+		   	            	
+			   	             	graphic.popupTemplate = {
+			   	                    // autocasts as new PopupTemplate()
+			   	                    title: "{locationCode} : {locationName}",
+			   	                    content:attributeInfo
+			   	                  };
+			 					features.push(graphic);
+			 	   	   		//geojsonLayer.popupTemplate = template; 	
+		   		   		  	   		    			   		    				
+	   		    			}
+	   		    			showPopup(features);
+	   		    			
+	   		    		}
+	   		        });
+	   		     	
+	   		     	function populateAttributes(attributes)
+	   		     	{
+	   		     		// validate if input data is null
+	   		     		   var attributeInfo="";
+	   			   		   var address = null;
+	   			   		   var facilityName = null;
+	   			   		   var ownershipName = null;
+	   			   		   var statusName = null;
+	   			   		   var constTempDate = null;
+	   			   		   var realPropTypeName = null;
+	   			   		   var histStatusName = null;
+	   			   		   var securityName = null;
+	   			   		   var missionDepName = null;
+	   			   		   
+	   			   		   if(attributes.address == null){
+	   			   			   address = "";
+	   			   		   } else {
+	   			   			   address = attributes.address;
+	   			   		   }
+	   			   		   if(attributes.facilityName == null){
+	   			   			   facilityName = "";
+	   			   		   } else {
+	   			   			   facilityName = attributes.facilityName;
+	   			   		   }
+	   			   		   if(attributes.ownershipName == null){
+	   			   			   ownershipName = "";
+	   			   		   } else {
+	   			   			   ownershipName = attributes.ownershipName;
+	   			   		   }
+	   			   		   if(attributes.statusName == null){
+	   			   			   statusName = "";
+	   			   		   } else if(attributes.statusName == "Decommissi"){
+							   statusName = "Decomissioned";
+	   				   	   } else{
+						       statusName = attributes.statusName;
+						   }
+	   			   		   if(attributes.constTempDateYear == null){
+	   			   			   constTempDateYear = "";
+	   			   		   } else {
+	   			   			   constTempDateYear = attributes.constTempDateYear;
+	   				   	   }
+	   			   		   if(attributes.realPropTypeName == null){
+	   			   			   realPropTypeName = "";
+	   			   		   } else {
+	   			   			   realPropTypeName = attributes.realPropTypeName;
+	   				   	   }
+	   			   		   if(attributes.histStatusName == null){
+	   			   			   histStatusName = "";
+	   			   		   } else {
+	   			   			   histStatusName = attributes.histStatusName;
+	   				   	   }
+	   			   		   if(attributes.securityName == null){
+	   			   			   securityName = "";
+	   			   		   } else {
+	   			   			   securityName = attributes.securityName;
+	   				   	   }
+	   			   		   if(attributes.missionDepName == null){
+	   			   			   missionDepName = "";
+	   			   		   } else {
+	   			   			   missionDepName = attributes.missionDepName;
+	   				   	   }
+	   			   		  var regionCode = null;
+	   			   	 	var serverName = [[${serverName}]]
+	   			   		   var state = attributes.locationCode.toString().substring(0,2);
+	   			   		   if(attributes.regionCode == 7){
+	   			   			   regionCode = "07";
+	   			   		   } else {
+	   			   			   regionCode = attributes.regionCode;
+	   			   		   }
+	   			   		   var locationCode = attributes.locationCode;
+			   			var cfrFolderPath = "<a href = https://" + serverName + "/cfr/page/site/r" + regionCode + "/documentlibrary#filter=path%7C%2F" + state  + "%2F" + attributes.locationCode + "%7C&page=1 style=\"color:blue;\"> CFR Folder </a>";
+		   	               	if (attributes.dispDateYear != null){
+		   	               		if(attributes.folderExistFlag == 1){
+		   		               		attributeInfo =`${cfrFolderPath}
+		   		               			<br>Address: ${address}
+		   		               		 	<br>Region: ${attributes.regionCode} - ${attributes.regionName}
+		   				                <br>Ownership: ${ownershipName}
+		   				                <br>Status: ${statusName}
+		   				                <br>Facility: ${facilityName}
+		   				                <br>Constructed: ${constTempDateYear} & Disposed: ${attributes.dispDateYear} 
+		   				                <br>Real Property Type: ${realPropTypeName}
+		   				                <br>Mission Dependency: ${missionDepName}
+		   				                <br>Historical Status: ${histStatusName}
+		   				                <br>Security: ${securityName}
+		   				                <br>Building Levels Above: ${attributes.floorsAboveGround}
+		   				                <br>Building Levels Below: ${attributes.floorsBelowGround}
+		   				                <br>Total Building Levels: ${attributes.floorsTotal}
+		   				                <br>Design Gross: ${attributes.estGsf}
+		   				                <br>Rentable: ${attributes.rsf}  
+		   				                <br>Rentable Vacant: ${attributes.vrsf}
+		   				                <br>Usable: ${attributes.usf}  
+		   				                <br>Usable Vacant: ${attributes.vusf}
+		   				                <br>R/U Factor: ${attributes.ru}
+		   				                <br>Structure Parking: ${attributes.stp}
+		   				                <br>Surface Parking: ${attributes.sup}`;
+		   	               		} else {
+									var cfrFolder = "<span style=\"color:red;\">CFR folder does not exist</span>";
+		   	               			attributeInfo =`${cfrFolder}
+		   		               			<br>Address: ${address}
+		   		               		 	<br>Region: ${attributes.regionCode} - ${attributes.regionName}
+		   				                <br>Ownership: ${ownershipName}
+		   				                <br>Status: ${statusName}
+		   				                <br>Facility: ${facilityName}
+		   				                <br>Constructed: ${constTempDateYear} & Disposed: ${attributes.dispDateYear} 
+		   				                <br>Real Property Type: ${realPropTypeName}
+		   				                <br>Mission Dependency: ${missionDepName}
+		   				                <br>Historical Status: ${histStatusName}
+		   				                <br>Security: ${securityName}
+		   				                <br>Building Levels Above: ${attributes.floorsAboveGround}
+		   				                <br>Building Levels Below: ${attributes.floorsBelowGround}
+		   				                <br>Total Building Levels: ${attributes.floorsTotal}
+		   				                <br>Design Gross: ${attributes.estGsf}
+		   				                <br>Rentable: ${attributes.rsf}  
+		   				                <br>Rentable Vacant: ${attributes.vrsf}
+		   				                <br>Usable: ${attributes.usf}  
+		   				                <br>Usable Vacant: ${attributes.vusf}
+		   				                <br>R/U Factor: ${attributes.ru}
+		   				                <br>Structure Parking: ${attributes.stp}
+		   				                <br>Surface Parking: ${attributes.sup}`;
+		   	               		}
+		   	               	}
+		   	               	else {
+		   	               		if(attributes.folderExistFlag == 1){
+		   	               			attributeInfo =`${cfrFolderPath}
+		   	               				<br>Address: ${address}
+		   	               				<br>Region: ${attributes.regionCode} - ${attributes.regionName}
+		   				                <br>Ownership: ${ownershipName}
+		   				                <br>Status: ${statusName}
+		   				                <br>Facility: ${facilityName}
+		   				                <br>Constructed: ${constTempDateYear}
+		   				                <br>Real Property Type: ${realPropTypeName}
+		   				                <br>Mission Dependency: ${missionDepName}
+		   				                <br>Historical Status: ${histStatusName}
+		   				                <br>Security: ${securityName}
+		   				                <br>Building Levels Above: ${attributes.floorsAboveGround}
+		   				                <br>Building Levels Below: ${attributes.floorsBelowGround}
+		   				                <br>Total Building Levels: ${attributes.floorsTotal}
+		   				                <br>Design Gross: ${attributes.estGsf}
+		   				                <br>Rentable: ${attributes.rsf}  
+		   				                <br>Rentable Vacant: ${attributes.vrsf}
+		   				                <br>Usable: ${attributes.usf}  
+		   				                <br>Usable Vacant: ${attributes.vusf}
+		   				                <br>R/U Factor: ${attributes.ru}
+		   				                <br>Structure Parking: ${attributes.stp}
+		   				                <br>Surface Parking: ${attributes.sup}`;
+		   	               		} else {
+									var cfrFolder = "<span style=\"color:red;\">CFR folder does not exist</span>";
+		   	               			attributeInfo =`${cfrFolder}
+		   	               				<br>Address: ${address}
+		   	               				<br>Region: ${attributes.regionCode} - ${attributes.regionName}
+		   				                <br>Ownership: ${ownershipName}
+		   				                <br>Status: ${statusName}
+		   				                <br>Facility: ${facilityName}
+		   				                <br>Constructed: ${constTempDateYear}
+		   				                <br>Real Property Type: ${realPropTypeName}
+		   				                <br>Mission Dependency: ${missionDepName}
+		   				                <br>Historical Status: ${histStatusName}
+		   				                <br>Security: ${securityName}
+		   				                <br>Building Levels Above: ${attributes.floorsAboveGround}
+		   				                <br>Building Levels Below: ${attributes.floorsBelowGround}
+		   				                <br>Total Building Levels: ${attributes.floorsTotal}
+		   				                <br>Design Gross: ${attributes.estGsf}
+		   				                <br>Rentable: ${attributes.rsf}  
+		   				                <br>Rentable Vacant: ${attributes.vrsf}
+		   				                <br>Usable: ${attributes.usf}  
+		   				                <br>Usable Vacant: ${attributes.vusf}
+		   				                <br>R/U Factor: ${attributes.ru}
+		   				                <br>Structure Parking: ${attributes.stp}
+		   				                <br>Surface Parking: ${attributes.sup}`;
+		   	               		}
+		   	               	}
+		   	               	return attributeInfo;
+	   		     	}
+	   		         function showPopup(response) {
+		   	            if (response.length > 0) {
+		   	              view.popup.open({
+		   	                features: response,
+		   	                location: event.mapPoint
+		   	              });
+		   	            }
+			           
+		   	          
+					} 
+		   				      
+		   		   	  
+		           
+	   	          
+				} 
+	
+	   		    
+   	    });
+  		    
+  		 });		   
+      
+     });
+    </script>
+</head>
+
+<body>
+	<div id="viewDiv"
+		style="padding: 0; margin: 0; width: 100%; height: 100%">
+		<div id="loadingDiv"
+			style="position: absolute; z-index: 10; top: 50%; left: 50%; padding: 10px; margin: -40px 0 0 -125px; text-align: center;">
+			<img id="loadingImg" src="images/loading.gif" />
+		</div>
+	</div>
+	<span id="layerToggle" class="esri-widget">
+	<input type="checkbox" checked id="legendSwitch" /> Legend
+	</span>
+	<div id="info">
+		<span id="name"
+			style="color: blue; font-size: 14px; font-weight: bold;"></span> <br />
+	</div>
+</body>
+</html>

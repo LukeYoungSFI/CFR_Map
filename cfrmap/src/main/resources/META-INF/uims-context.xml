@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                            http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!--context:property-placeholder location="classpath:META-INF/uims.properties" 
+		/ -->
+	<!-- -->
+	<bean id="uimsClientUserProfile" parent="websvcClient1"
+		class="com.sfi.cfrmap.uims.UimsClientUserProfileImpl" lazy-init="true">
+		<property name="applicationName"
+			value="${uims.application.name}" />
+		<property name="publicKey" value="${uims.public.key}" />
+		<property name="privateKey" value="${uims.private.key}" />
+		<property name="charFormat" value="ASCII" />
+		<property name="marshaller" ref="jaxb2Marshaller1" />
+		<property name="unmarshaller" ref="jaxb2UnMarshaller1" />
+	</bean>
+
+	<bean id="jaxb2Marshaller1"
+		class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype">
+		<property name="contextPath"
+			value="gov.gsa.pbs.servicesgen.uims.ws" />
+	</bean>
+	<bean id="jaxb2UnMarshaller1"
+		class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype">
+		<property name="contextPath"
+			value="gov.gsa.pbs.servicesgen.uims.ws" />
+	</bean>
+
+	<bean id="websvcClient1" abstract="true" lazy-init="true">
+		<constructor-arg ref="messageFactory"
+			type="org.springframework.ws.WebServiceMessageFactory" />
+		<property name="defaultUri" value="${uims.profile.url}" />
+		<!--http://sdv-devlinjbs01/uimsws/UserProfileWS_v2 -->
+	</bean>
+
+
+
+	<bean id="uimsClientUserInfo" parent="websvcClient2"
+		class="com.sfi.cfrmap.uims.UimsClientUserInfoImpl" lazy-init="true">
+		<!--property name="userId" value="${uims.userId}"/> -->
+		<property name="applicationName"
+			value="${uims.application.name}" />
+		<property name="publicKey" value="${uims.public.key}" />
+		<property name="privateKey" value="${uims.private.key}" />
+		<property name="charFormat" value="ASCII" />
+		<property name="marshaller" ref="jaxb2Marshaller2" />
+		<property name="unmarshaller" ref="jaxb2UnMarshaller2" />
+	</bean>
+	<bean id="jaxb2Marshaller2"
+		class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype">
+		<property name="contextPath"
+			value="gov.gsa.pbs.servicesgen.uimsclientv2" />
+	</bean>
+	<bean id="jaxb2UnMarshaller2"
+		class="org.springframework.oxm.jaxb.Jaxb2Marshaller" scope="prototype">
+		<property name="contextPath"
+			value="gov.gsa.pbs.servicesgen.uimsclientv2" />
+	</bean>
+
+	<bean id="websvcClient2" abstract="true" lazy-init="true">
+		<constructor-arg ref="messageFactory"
+			type="org.springframework.ws.WebServiceMessageFactory" />
+		<property name="defaultUri" value="${uims.auth.url}" />
+		<!--http://sdv-devlinjbs01/uimsws/UserInfoWS_v2 -->
+	</bean>
+	<bean id="messageFactory"
+		class="org.springframework.ws.soap.saaj.SaajSoapMessageFactory"></bean>
+</beans>
+
